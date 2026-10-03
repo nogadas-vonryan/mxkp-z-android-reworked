@@ -116,6 +116,7 @@ jobs:
       - name: Build release APK
         run: |
           ./gradlew assembleRelease \
+            -PbuildAbis=arm64-v8a \
             -Pandroid.suppressUnsupportedCompileSdk=34 \
             --no-daemon \
             --stacktrace

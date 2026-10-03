@@ -2,6 +2,14 @@ plugins {
     id 'com.android.application'
 }
 
+// Default to arm64. For a universal ARM APK, prepare dependencies for both ABIs
+// and build with -PbuildAbis=arm64-v8a,armeabi-v7a.
+def buildAbis = (project.findProperty('buildAbis') ?: 'arm64-v8a')
+        .split(',').collect { it.trim() }.findAll { !it.isEmpty() }.unique()
+if (buildAbis.isEmpty() || buildAbis.any { !(it in ['arm64-v8a', 'armeabi-v7a']) }) {
+    throw new GradleException('buildAbis must contain arm64-v8a and/or armeabi-v7a')
+}
+
 android {
     namespace 'com.hatkid.mkxpz'
     compileSdk 33
@@ -13,7 +21,10 @@ android {
         versionCode 11
         versionName "0.1.1"
         archivesBaseName = "mkxp-z-$versionName"
-        ndk.debugSymbolLevel = 'FULL'
+        ndk {
+            debugSymbolLevel = 'FULL'
+            abiFilters.addAll(buildAbis)
+        }
     }
 
     buildTypes {
@@ -32,9 +43,8 @@ android {
         abi {
             enable true
             reset()
-            // You can build also 'x86' and 'x86_64' if you want (useful for AVD debugging)
-            include 'arm64-v8a', 'armeabi-v7a'
-            universalApk true
+            include(*buildAbis)
+            universalApk (buildAbis.size() > 1)
         }
     }
 
