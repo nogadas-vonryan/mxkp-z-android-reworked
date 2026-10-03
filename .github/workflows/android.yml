@@ -122,6 +122,11 @@ jobs:
             --no-daemon \
             --stacktrace
 
+      - name: Select arm64 release APK
+        run: |
+          APK=$(python3 .github/scripts/select_arm64_apk.py app/build/outputs/apk/release)
+          echo "UNSIGNED_APK_PATH=$APK" >> "$GITHUB_ENV"
+
       # ── 12. Sign APK (optional — uses secrets when available) ─────────────────
       - name: Sign APK
         if: ${{ env.HAS_SIGNING_KEY == 'true' }}
@@ -137,12 +142,6 @@ jobs:
           KEYSTORE_FILE=$(mktemp "$RUNNER_TEMP/mkxp-signing.XXXXXX")
           trap 'rm -f "$KEYSTORE_FILE"' EXIT
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
-          shopt -s nullglob
-          APKS=(app/build/outputs/apk/release/*-arm64-v8a-release.apk)
-          if [ "${#APKS[@]}" -ne 1 ]; then
-            echo "Expected exactly one arm64 release APK" >&2
-            exit 1
-          fi
           APKSIGNER="$ANDROID_HOME/build-tools/30.0.3/apksigner"
           "$APKSIGNER" sign \
             --ks "$KEYSTORE_FILE" \
@@ -150,20 +149,14 @@ jobs:
             --ks-pass env:STORE_PASSWORD \
             --key-pass env:KEY_PASSWORD \
             --out mkxp-z-arm64-v8a-signed.apk \
-            "${APKS[0]}"
+            "$UNSIGNED_APK_PATH"
           "$APKSIGNER" verify --verbose mkxp-z-arm64-v8a-signed.apk
           echo "APK_PATH=mkxp-z-arm64-v8a-signed.apk" >> "$GITHUB_ENV"
 
       - name: Set unsigned APK path (no signing secrets)
         if: ${{ env.HAS_SIGNING_KEY != 'true' }}
         run: |
-          shopt -s nullglob
-          APKS=(app/build/outputs/apk/release/*-arm64-v8a-release.apk)
-          if [ "${#APKS[@]}" -ne 1 ]; then
-            echo "Expected exactly one arm64 release APK" >&2
-            exit 1
-          fi
-          cp "${APKS[0]}" unsigned-release.apk
+          cp "$UNSIGNED_APK_PATH" unsigned-release.apk
           echo "APK_PATH=unsigned-release.apk" >> "$GITHUB_ENV"
 
       # ── 13. Upload APK as artifact (always) ───────────────────────────────────
