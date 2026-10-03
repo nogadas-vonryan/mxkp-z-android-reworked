@@ -23,7 +23,12 @@ android {
         archivesBaseName = "mkxp-z-$versionName"
         ndk {
             debugSymbolLevel = 'FULL'
-            abiFilters.addAll(buildAbis)
+        }
+        externalNativeBuild {
+            ndkBuild {
+                // Filter compilation here; ndk.abiFilters conflicts with APK splits.
+                abiFilters.addAll(buildAbis)
+            }
         }
     }
 
