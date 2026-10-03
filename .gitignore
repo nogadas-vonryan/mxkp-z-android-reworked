@@ -18,3 +18,8 @@ captures/
 .AppleDouble
 .LSOverride
 Thumbs.db
+
+# Private Android signing keys
+*.jks
+*.keystore
+*.p12

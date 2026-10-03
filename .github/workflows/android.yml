@@ -22,6 +22,7 @@ jobs:
     env:
       ANDROID_NDK_VERSION: 23.2.8568313
       RUBY_VERSION: "3.1"
+      HAS_SIGNING_KEY: ${{ secrets.KEYSTORE_BASE64 != '' }}
 
     steps:
       # ── 1. Checkout ──────────────────────────────────────────────────────────
@@ -123,31 +124,46 @@ jobs:
 
       # ── 12. Sign APK (optional — uses secrets when available) ─────────────────
       - name: Sign APK
-        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        if: ${{ env.HAS_SIGNING_KEY == 'true' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEY_ALIAS:       ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD:    ${{ secrets.KEY_PASSWORD }}
           STORE_PASSWORD:  ${{ secrets.STORE_PASSWORD }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > release.keystore
-          APK=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
-          $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | tail -1)/apksigner sign \
-            --ks release.keystore \
+          : "${KEY_ALIAS:?Missing KEY_ALIAS secret}"
+          : "${KEY_PASSWORD:?Missing KEY_PASSWORD secret}"
+          : "${STORE_PASSWORD:?Missing STORE_PASSWORD secret}"
+          KEYSTORE_FILE=$(mktemp "$RUNNER_TEMP/mkxp-signing.XXXXXX")
+          trap 'rm -f "$KEYSTORE_FILE"' EXIT
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
+          shopt -s nullglob
+          APKS=(app/build/outputs/apk/release/*-arm64-v8a-release.apk)
+          if [ "${#APKS[@]}" -ne 1 ]; then
+            echo "Expected exactly one arm64 release APK" >&2
+            exit 1
+          fi
+          APKSIGNER="$ANDROID_HOME/build-tools/30.0.3/apksigner"
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE_FILE" \
             --ks-key-alias "$KEY_ALIAS" \
-            --ks-pass "pass:$STORE_PASSWORD" \
-            --key-pass "pass:$KEY_PASSWORD" \
-            --out signed-release.apk \
-            "$APK"
-          echo "APK_PATH=signed-release.apk" >> "$GITHUB_ENV"
+            --ks-pass env:STORE_PASSWORD \
+            --key-pass env:KEY_PASSWORD \
+            --out mkxp-z-arm64-v8a-signed.apk \
+            "${APKS[0]}"
+          "$APKSIGNER" verify --verbose mkxp-z-arm64-v8a-signed.apk
+          echo "APK_PATH=mkxp-z-arm64-v8a-signed.apk" >> "$GITHUB_ENV"
 
       - name: Set unsigned APK path (no signing secrets)
-        if: ${{ env.KEYSTORE_BASE64 == '' }}
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        if: ${{ env.HAS_SIGNING_KEY != 'true' }}
         run: |
-          APK=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
-          cp "$APK" unsigned-release.apk
+          shopt -s nullglob
+          APKS=(app/build/outputs/apk/release/*-arm64-v8a-release.apk)
+          if [ "${#APKS[@]}" -ne 1 ]; then
+            echo "Expected exactly one arm64 release APK" >&2
+            exit 1
+          fi
+          cp "${APKS[0]}" unsigned-release.apk
           echo "APK_PATH=unsigned-release.apk" >> "$GITHUB_ENV"
 
       # ── 13. Upload APK as artifact (always) ───────────────────────────────────
