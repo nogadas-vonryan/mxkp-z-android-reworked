@@ -31,7 +31,7 @@ public class MainActivity extends SDLActivity
     // Put your Java-side stuff here.
 
     private static final String TAG = "mkxp-z[Activity]";
-    private static final String GAME_PATH_DEFAULT = Environment.getExternalStorageDirectory() + "/mkxp-z";
+    private static final String GAME_PATH_DEFAULT = StartupConfig.directory().getAbsolutePath();
     private static String GAME_PATH = GAME_PATH_DEFAULT;
     private static String OBB_MAIN_FILENAME;
     private static boolean DEBUG = false;
@@ -141,6 +141,22 @@ public class MainActivity extends SDLActivity
 
         if (mLayout != null) {
             mGamepad.attachTo(this, mLayout);
+            android.widget.Button settings = new android.widget.Button(this);
+            settings.setText("Settings");
+            settings.setContentDescription("Stop game and open settings");
+            android.widget.RelativeLayout.LayoutParams position = new android.widget.RelativeLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+            position.addRule(android.widget.RelativeLayout.ALIGN_PARENT_TOP);
+            position.addRule(android.widget.RelativeLayout.CENTER_HORIZONTAL);
+            mLayout.addView(settings, position);
+            settings.setOnClickListener(view -> new android.app.AlertDialog.Builder(this)
+                    .setTitle("Open settings?")
+                    .setMessage("This stops the game. Save your progress in the game first.")
+                    .setNegativeButton("Keep playing", null)
+                    .setPositiveButton("Open settings", (dialog, which) -> {
+                        startActivity(new Intent(this, SettingsActivity.class));
+                        finish();
+                    }).show());
         }
     }
 
