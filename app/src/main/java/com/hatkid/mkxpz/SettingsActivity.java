@@ -311,21 +311,28 @@ public class SettingsActivity extends Activity {
         File initial = collection ? library.gamesDirectory() : Environment.getExternalStorageDirectory();
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(16), 0, dp(16), 0);
+        box.setPadding(dp(16), dp(16), dp(16), 0);
         EditText path = new EditText(this);
         ui.input(path, true);
         path.setSingleLine(true);
         path.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         path.setText(initial.getAbsolutePath());
         box.addView(path);
+        LinearLayout navigation = new LinearLayout(this);
+        Button up = ui.action("Go to parent", false);
         Button go = ui.action("Go to path", false);
-        LinearLayout.LayoutParams goParams = new LinearLayout.LayoutParams(-1, -2);
-        goParams.topMargin = dp(12);
-        box.addView(go, goParams);
+        LinearLayout.LayoutParams upParams = new LinearLayout.LayoutParams(0, -2, 1);
+        upParams.rightMargin = dp(6);
+        navigation.addView(up, upParams);
+        navigation.addView(go, new LinearLayout.LayoutParams(0, -2, 1));
+        LinearLayout.LayoutParams navigationParams = new LinearLayout.LayoutParams(-1, -2);
+        navigationParams.topMargin = dp(12);
+        box.addView(navigation, navigationParams);
         ListView list = new ListView(this);
         list.setDivider(null);
         int listHeight = Math.max(dp(96), Math.min(dp(280), getResources().getDisplayMetrics().heightPixels - dp(300)));
         box.addView(list, new LinearLayout.LayoutParams(-1, listHeight));
+        File[] current = {initial};
         List<File> children = new ArrayList<>();
         Runnable refresh = () -> {
             try {
@@ -334,6 +341,8 @@ public class SettingsActivity extends Activity {
                 File[] directories = folder.listFiles(File::isDirectory);
                 if (directories == null) throw new java.io.IOException("Cannot read this folder. Check storage access.");
                 Arrays.sort(directories, (left, right) -> left.getName().compareToIgnoreCase(right.getName()));
+                current[0] = folder;
+                up.setEnabled(folder.getParentFile() != null);
                 path.setText(folder.getAbsolutePath());
                 children.clear();
                 children.addAll(Arrays.asList(directories));
@@ -343,6 +352,10 @@ public class SettingsActivity extends Activity {
             } catch (Exception e) { error(e); }
         };
         go.setOnClickListener(v -> refresh.run());
+        up.setOnClickListener(v -> {
+            File parent = current[0].getParentFile();
+            if (parent != null) { path.setText(parent.getAbsolutePath()); refresh.run(); }
+        });
         list.setOnItemClickListener((parent, view, position, id) -> {
             path.setText(children.get(position).getAbsolutePath()); refresh.run();
         });
