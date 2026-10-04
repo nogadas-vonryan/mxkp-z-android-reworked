@@ -39,6 +39,7 @@ public class MainActivity extends SDLActivity
     protected boolean mStarted = false;
 
     private StorageManager mStorageManager;
+    private Diagnostics diagnostics;
 
     // In-screen gamepad
     private final Gamepad mGamepad = new Gamepad();
@@ -110,7 +111,13 @@ public class MainActivity extends SDLActivity
                 File parent = new File(getFilesDir(), "sessions").getCanonicalFile();
                 if (parent.equals(directory.getParentFile()) && new File(directory, "mkxp.json").isFile()) {
                     GAME_PATH = directory.getAbsolutePath();
-
+                    diagnostics = new Diagnostics(directory);
+                    diagnostics.start();
+                    Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
+                    Thread.setDefaultUncaughtExceptionHandler((thread, error) -> {
+                        diagnostics.append("messages.log", "Uncaught Java exception in " + thread.getName() + "\n" + Log.getStackTraceString(error));
+                        if (previous != null) previous.uncaughtException(thread, error);
+                    });
                 }
             } catch (java.io.IOException e) { Log.e(TAG, "Invalid launch session", e); }
         }
@@ -155,6 +162,12 @@ public class MainActivity extends SDLActivity
         }
     }
 
+    @Override public int messageboxShowMessageBox(int flags, String title, String message,
+            int[] buttonFlags, int[] buttonIds, String[] buttonTexts, int[] colors) {
+        if (diagnostics != null) diagnostics.append("messages.log", title + "\n" + message);
+        return super.messageboxShowMessageBox(flags, title, message, buttonFlags, buttonIds, buttonTexts, colors);
+    }
+
     @Override
     protected void onStart()
     {
@@ -183,6 +196,7 @@ public class MainActivity extends SDLActivity
     protected void onDestroy()
     {
         super.onDestroy();
+        if (diagnostics != null) diagnostics.stop();
 
         // HACK: Exiting the JVM (process) since Ruby does not likes when we
         // trying to re-initialize Ruby VM in mkxp-z (JNI native library)

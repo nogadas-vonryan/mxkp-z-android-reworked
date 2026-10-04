@@ -49,7 +49,13 @@ shims = {
         public java.io.FileOutputStream startWrite() throws java.io.IOException { return new java.io.FileOutputStream(file); }
         public void finishWrite(java.io.FileOutputStream stream) throws java.io.IOException { stream.close(); }
         public void failWrite(java.io.FileOutputStream stream) { try { stream.close(); } catch (Exception ignored) {} } }''',
-
+    'android/os/Process.java': '''package android.os;
+        public class Process { public static int myPid() { return 123; } }''',
+    'android/util/Log.java': '''package android.util;
+        public class Log { public static int w(String tag,String message,Throwable error) { return 0; }
+        public static String getStackTraceString(Throwable error) {
+        java.io.StringWriter text=new java.io.StringWriter(); error.printStackTrace(new java.io.PrintWriter(text));
+        return text.toString(); } }''',
 }
 with tempfile.TemporaryDirectory(prefix='mkxp-library-tests-') as temp:
     work = Path(temp)
@@ -60,7 +66,7 @@ with tempfile.TemporaryDirectory(prefix='mkxp-library-tests-') as temp:
         file.write_text(source)
         sources.append(str(file))
     package = root / 'app/src/main/java/com/hatkid/mkxpz'
-    sources += [str(package / (name + '.java')) for name in ('StartupConfig', 'ConfigText', 'GameLibrary', 'LaunchSession')]
+    sources += [str(package / (name + '.java')) for name in ('StartupConfig', 'ConfigText', 'GameLibrary', 'LaunchSession', 'Diagnostics')]
     test = root / 'tests/java/com/hatkid/mkxpz'
     sources += [str(test / 'LibrarySessionTest.java'), str(test / 'ConfigTextTest.java')]
     classes = work / 'classes'

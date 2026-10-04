@@ -24,7 +24,7 @@ final class LaunchSession {
         if (chosen == null) chosen = preloads(options);
         JSONArray enabled = new JSONArray();
         Set<String> seen = new LinkedHashSet<>();
-        // Validate user selections before creating a session.
+        // Validate user selections before creating a session or changing the report pointer.
         for (int i = 0; i < chosen.length(); i++) {
             String path = resolveScript(game, chosen.getString(i));
             if (!new File(path).isFile()) throw new IOException("Preload script is missing: " + path + "\nOpen this game's settings to disable it or restore the file.");
@@ -33,10 +33,40 @@ final class LaunchSession {
         directory = new File(new File(context.getFilesDir(), "sessions"),
                 System.currentTimeMillis() + "-" + UUID.randomUUID().toString().substring(0, 8));
         if (!directory.mkdirs()) throw new IOException("Cannot create a launch session");
+        // This optional observer logs full Ruby raise backtraces before native dialogs truncate them.
+        if (profile.optBoolean("traceExceptions", true)) {
+            File observer = new File(directory, "exception-trace.rb");
+            String template;
+            try (java.io.InputStream stream = context.getAssets().open("diagnostics/exception-trace.rb");
+                 java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream()) {
+                byte[] buffer = new byte[4096];
+                int count;
+                while ((count = stream.read(buffer)) != -1) bytes.write(buffer, 0, count);
+                template = new String(bytes.toByteArray(), StandardCharsets.UTF_8);
+            }
+            String logPath = new File(directory, "ruby-exceptions.log").getAbsolutePath();
+            String literal = "'" + logPath.replace("\\", "\\\\").replace("'", "\\'") + "'";
+            StartupConfig.write(observer, template.replace("__LOG_PATH__", literal).getBytes(StandardCharsets.UTF_8));
+            enabled.put(observer.getAbsolutePath());
+        }
         for (String path : seen) enabled.put(path);
         options.put("gameFolder", game.getCanonicalPath());
         options.put("preloadScript", enabled);
+        // Name game-script frames in the existing engine's exception backtraces.
+        options.put("useScriptNames", true);
         StartupConfig.write(new File(directory, "mkxp.json"), options.toString(2).getBytes(StandardCharsets.UTF_8));
+        JSONObject summary = new JSONObject();
+        summary.put("game", game.getCanonicalPath());
+        summary.put("title", GameLibrary.title(game));
+        summary.put("started", new java.util.Date().toString());
+        summary.put("device", android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL);
+        summary.put("android", android.os.Build.VERSION.RELEASE);
+        summary.put("abis", new JSONArray(Arrays.asList(android.os.Build.SUPPORTED_ABIS)));
+        summary.put("appVersion", context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionName);
+        summary.put("engine", "Bundled mkxp-z (build reports 2.4)");
+        summary.put("note", "Save-directory mkxp.json overrides can supersede this launch configuration. Ruby raise events may include exceptions handled normally by the game.");
+        StartupConfig.write(new File(directory, "session.json"), summary.toString(2).getBytes(StandardCharsets.UTF_8));
+        StartupConfig.write(new File(context.getFilesDir(), "latest-session.txt"), directory.getAbsolutePath().getBytes(StandardCharsets.UTF_8));
         prune(directory);
     }
 

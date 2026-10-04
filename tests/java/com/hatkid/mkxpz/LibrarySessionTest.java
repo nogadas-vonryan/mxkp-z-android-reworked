@@ -57,34 +57,48 @@ public final class LibrarySessionTest {
         JSONObject bindings = initial.options.getJSONObject("bindingNames");
         check(bindings.getString("c").equals("Confirm") && bindings.getString("x").equals("Jump"), "Bindings were not merged");
         JSONArray preloads = initial.options.getJSONArray("preloadScript");
-        check(preloads.length() == 2, "Initial preload selection was not preserved");
-        check(preloads.getString(0).equals(shared.getCanonicalPath()), "Shared scripts were not resolved absolutely");
-        check(preloads.getString(1).equals(new File(a, "scripts/local.rb").getCanonicalPath()), "Game-relative scripts changed");
+        check(preloads.length() == 3, "Initial preload selection was not preserved");
+        check(preloads.getString(1).equals(shared.getCanonicalPath()), "Shared scripts were not resolved absolutely");
+        check(preloads.getString(2).equals(new File(a, "scripts/local.rb").getCanonicalPath()), "Game-relative scripts changed");
+        check(!read(new File(initial.directory, "exception-trace.rb")).contains("__LOG_PATH__"), "Trace path was not inserted");
         check(initial.options.getString("gameFolder").equals(a.getCanonicalPath()), "Selected game path is wrong");
 
         JSONObject profile = new JSONObject();
         profile.put("display", new JSONObject().put("fullscreen", true));
         profile.put("scripts", new JSONArray());
+        profile.put("traceExceptions", false);
         library.saveProfile(a, profile);
         LaunchSession disabled = new LaunchSession(context, a, library);
         check(disabled.options.getJSONArray("preloadScript").length() == 0, "Explicitly disabled preloads came back");
         check(disabled.options.getBoolean("fullscreen"), "Per-game display setting failed");
         LaunchSession other = new LaunchSession(context, b, new GameLibrary(context));
         check(!other.options.getBoolean("fullscreen"), "Display settings leaked to another game");
-        check(other.options.getJSONArray("preloadScript").length() == 1, "Script selection leaked to another game");
+        check(other.options.getJSONArray("preloadScript").length() == 2, "Script selection leaked to another game");
         check(rootBefore.equals(read(rootConfig)) && gameBefore.equals(read(gameConfig)), "Original configs were modified");
 
         profile.put("scripts", new JSONArray().put("scripts/missing.rb"));
         library.saveProfile(a, profile);
+        String latestBefore = read(new File(context.getFilesDir(), "latest-session.txt"));
         try { new LaunchSession(context, a, library); throw new AssertionError("Missing preload was accepted"); }
         catch (java.io.IOException expected) { check(expected.getMessage().contains("missing"), "Missing preload was not identified"); }
+        check(latestBefore.equals(read(new File(context.getFilesDir(), "latest-session.txt"))), "Failed launch replaced the latest successful report");
         library.saveProfile(a, new JSONObject());
-        check(new LaunchSession(context, a, library).options.getJSONArray("preloadScript").length() == 2, "Reset did not restore original selections");
+        check(new LaunchSession(context, a, library).options.getJSONArray("preloadScript").length() == 3, "Reset did not restore original selections");
         check(new File(context.getFilesDir(), "sessions").listFiles(File::isDirectory).length <= 5, "Session retention is unbounded");
+        File latest = new File(read(new File(context.getFilesDir(), "latest-session.txt")));
+        Diagnostics diagnostics = new Diagnostics(latest);
+        char[] large = new char[1024 * 1024 + 50];
+        java.util.Arrays.fill(large, 'x');
+        diagnostics.append("messages.log", new String(large));
+        diagnostics.append("messages.log", "should not exceed the cap");
+        check(new File(latest, "messages.log").length() == 1024 * 1024, "Diagnostic log cap failed");
+        write(new File(latest, "ruby-exceptions.log"), "NoMethodError: undefined method index\n059:game-script:59\n");
+        String report = Diagnostics.report(context);
+        check(report.contains("NoMethodError") && report.contains("059:game-script:59") && report.contains("appVersion"), "Diagnostic report lost exception details or metadata");
         write(gameConfig, "{invalid config");
         try { new LaunchSession(context, a, library); throw new AssertionError("Broken config was accepted"); }
         catch (Exception expected) { check(expected.getMessage().contains("mkxp.json"), "Broken config path was not reported"); }
-        System.out.println("Library discovery, script selection, config isolation, and retention checks passed");
+        System.out.println("Library discovery, script selection, config isolation, retention and diagnostic report checks passed");
     }
 
     private static File game(File folder, String title, String executable) throws Exception {

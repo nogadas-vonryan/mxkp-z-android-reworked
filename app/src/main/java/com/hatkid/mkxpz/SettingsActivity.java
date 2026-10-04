@@ -28,6 +28,7 @@ public class SettingsActivity extends Activity {
     private final ExecutorService work = Executors.newSingleThreadExecutor();
     private final Map<String, Switch> display = new LinkedHashMap<>();
     private final List<ScriptRow> scripts = new ArrayList<>();
+    private Switch trace;
     private File editing;
     private String screen = "library";
     private int generation;
@@ -74,11 +75,11 @@ public class SettingsActivity extends Activity {
 
     @Override protected void onSaveInstanceState(Bundle state) {
         super.onSaveInstanceState(state);
-        if (screen.equals("settings") && editing != null && !display.isEmpty()) {
+        if (screen.equals("settings") && editing != null && trace != null) {
             try {
                 state.putString("editing", editing.getAbsolutePath());
                 state.putString("draft", currentProfile().toString());
-            } catch (Exception e) { android.util.Log.w("mkxp-wrapper", "Launcher error", e); }
+            } catch (Exception e) { Diagnostics.recordLauncherError(this, e); }
         }
     }
 
@@ -111,6 +112,7 @@ public class SettingsActivity extends Activity {
         screen = destination;
         display.clear();
         scripts.clear();
+        trace = null;
         ScrollView scroll = new ScrollView(this);
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -201,11 +203,13 @@ public class SettingsActivity extends Activity {
         menu.getMenu().add("Add game").setEnabled(library != null && hasStorageAccess());
         menu.getMenu().add("Games folder").setEnabled(library != null && hasStorageAccess());
         menu.getMenu().add("Refresh games");
+        menu.getMenu().add("Diagnostics");
         menu.setOnMenuItemClickListener(item -> {
             switch (item.getTitle().toString()) {
                 case "Add game": browseFolder(false); break;
                 case "Games folder": browseFolder(true); break;
                 case "Refresh games": showLibrary(); break;
+                case "Diagnostics": showDiagnostics(); break;
             }
             return true;
         });
@@ -346,6 +350,12 @@ public class SettingsActivity extends Activity {
                             } catch (Exception e) { error(e); }
                         }).show();
             });
+            heading("Diagnostics");
+            trace = new Switch(this);
+            trace.setText("Record Ruby exception backtraces");
+            trace.setChecked(profile.optBoolean("traceExceptions", true));
+            content.addView(trace);
+            text("Logs stay on this device until you export them. Tracing also records exceptions the game handles normally; turn it off if it affects performance. The latest five sessions are kept.");
             text("Shared mkxp.json supplies defaults; this game's mkxp.json overrides them. Save-directory overrides may still take precedence in the engine. Original config files are preserved.");
             button("Save", () -> {
                 try { library.saveProfile(game, currentProfile()); showLibrary(); toast("Game settings saved"); }
@@ -368,6 +378,7 @@ public class SettingsActivity extends Activity {
         JSONArray selected = new JSONArray();
         for (ScriptRow row : scripts) if (row.enabled) selected.put(row.path);
         profile.put("scripts", selected);
+        profile.put("traceExceptions", trace.isChecked());
         return profile;
     }
 
@@ -467,6 +478,43 @@ public class SettingsActivity extends Activity {
         });
     }
 
+    private void showDiagnostics() {
+        page("Diagnostics", "diagnostics");
+        text("Saved launch details, engine messages and Ruby backtraces. Raised exceptions can be handled normally by a game; their presence alone does not mean it crashed.");
+        button("Export report", () -> {
+            Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("text/plain");
+            intent.putExtra(Intent.EXTRA_TITLE, "mkxp-z-diagnostics.txt");
+            startActivityForResult(intent, 120);
+        });
+        button("Refresh report", this::showDiagnostics);
+        TextView preview = text("Reading report…");
+        preview.setTextSize(12);
+        preview.setTypeface(android.graphics.Typeface.MONOSPACE);
+        int token = generation;
+        work.execute(() -> {
+            try {
+                String report = Diagnostics.report(this);
+                String shown = report.length() > 32000 ? report.substring(0, 32000) + "\n[Preview shortened. Export to read the complete report.]" : report;
+                runOnUiThread(() -> { if (active(token)) preview.setText(shown); });
+            } catch (Exception e) { runOnUiThread(() -> { if (active(token)) error(e); }); }
+        });
+    }
+
+    @Override protected void onActivityResult(int request, int result, Intent data) {
+        super.onActivityResult(request, result, data);
+        if (request != 120 || result != RESULT_OK || data == null || data.getData() == null) return;
+        Uri destination = data.getData();
+        work.execute(() -> {
+            try (java.io.OutputStream stream = getContentResolver().openOutputStream(destination, "wt")) {
+                if (stream == null) throw new java.io.IOException("Cannot write the report.");
+                stream.write(Diagnostics.report(this).getBytes(StandardCharsets.UTF_8));
+                runOnUiThread(() -> { if (!isDestroyed()) toast("Report exported"); });
+            } catch (Exception e) { runOnUiThread(() -> { if (!isDestroyed()) error(e); }); }
+        });
+    }
+
     private static final class ScriptRow {
         final String path;
         boolean enabled;
@@ -484,7 +532,7 @@ public class SettingsActivity extends Activity {
     }
     private void toast(String message) { Toast.makeText(this, message, Toast.LENGTH_SHORT).show(); }
     private void error(Exception e) {
-        android.util.Log.w("mkxp-wrapper", "Launcher error", e);
+        Diagnostics.recordLauncherError(this, e);
         new AlertDialog.Builder(this).setTitle("Could not complete this action")
                 .setMessage(e.getMessage()).setPositiveButton("OK", null).show();
     }
