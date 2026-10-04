@@ -223,7 +223,7 @@ public class SettingsActivity extends Activity {
         String name = library.displayName(game);
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setBackground(ui.shape(LauncherUi.SURFACE, LauncherUi.CORNER, true));
+        row.setBackground(ui.shape(LauncherUi.SURFACE, LauncherUi.CORNER));
         row.setClipToOutline(true);
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
         cardParams.bottomMargin = dp(6);
@@ -232,7 +232,7 @@ public class SettingsActivity extends Activity {
         play.setGravity(Gravity.CENTER_VERTICAL);
         play.setPadding(dp(10), dp(8), dp(8), dp(8));
         play.setMinimumHeight(dp(64));
-        play.setBackground(ui.interactive(android.graphics.Color.TRANSPARENT, LauncherUi.CORNER, false));
+        play.setBackground(ui.interactive(android.graphics.Color.TRANSPARENT, LauncherUi.CORNER));
         play.setFocusable(true);
         play.setContentDescription("Play " + name);
         LinearLayout copy = new LinearLayout(this);
@@ -323,6 +323,7 @@ public class SettingsActivity extends Activity {
         goParams.topMargin = dp(12);
         box.addView(go, goParams);
         ListView list = new ListView(this);
+        list.setDivider(null);
         int listHeight = Math.max(dp(96), Math.min(dp(280), getResources().getDisplayMetrics().heightPixels - dp(300)));
         box.addView(list, new LinearLayout.LayoutParams(-1, listHeight));
         List<File> children = new ArrayList<>();
@@ -459,13 +460,13 @@ public class SettingsActivity extends Activity {
             ScriptRow script = scripts.get(i);
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.VERTICAL);
-            card.setBackground(ui.shape(LauncherUi.SURFACE, LauncherUi.CORNER, true));
+            card.setBackground(ui.shape(LauncherUi.SURFACE, LauncherUi.CORNER));
             LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
             cardParams.bottomMargin = dp(6);
             card.setLayoutParams(cardParams);
             CheckBox toggle = new CheckBox(this);
             ui.styleToggle(toggle);
-            toggle.setBackground(ui.interactive(android.graphics.Color.TRANSPARENT, LauncherUi.CORNER, false));
+            toggle.setBackground(ui.interactive(android.graphics.Color.TRANSPARENT, LauncherUi.CORNER));
             toggle.setPadding(dp(8), dp(6), dp(8), dp(6));
             toggle.setLayoutParams(new LinearLayout.LayoutParams(-1, -2));
             File file = new File(script.path);
@@ -491,7 +492,7 @@ public class SettingsActivity extends Activity {
             location.setPadding(dp(8), 0, 0, 0);
             location.setGravity(Gravity.CENTER_VERTICAL);
             location.setMinimumHeight(dp(48));
-            location.setBackground(ui.interactive(android.graphics.Color.TRANSPARENT, LauncherUi.CORNER, false));
+            location.setBackground(ui.interactive(android.graphics.Color.TRANSPARENT, LauncherUi.CORNER));
             location.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle(file.getName())
                     .setMessage(script.path).setPositiveButton("OK", null).show());
             footer.addView(location, new LinearLayout.LayoutParams(0, -2, 1));
