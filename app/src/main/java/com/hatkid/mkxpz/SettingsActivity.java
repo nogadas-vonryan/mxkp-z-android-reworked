@@ -35,9 +35,11 @@ public class SettingsActivity extends Activity {
     private boolean permissionPending;
     private boolean launching;
     private JSONObject draft;
+    private LauncherUi ui;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        ui = new LauncherUi(this);
         if (hasStorageAccess() && state != null && state.containsKey("editing")) {
             try {
                 draft = new JSONObject(state.getString("draft", "{}"));
@@ -114,6 +116,9 @@ public class SettingsActivity extends Activity {
         scripts.clear();
         trace = null;
         ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(LauncherUi.BACKGROUND);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         int padding = dp(20);
@@ -123,28 +128,29 @@ public class SettingsActivity extends Activity {
         LinearLayout bar = new LinearLayout(this);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         if (!destination.equals("library")) {
-            Button back = new Button(this);
-            back.setText("‹");
-            back.setContentDescription("Back to games");
+            ImageButton back = ui.icon(R.drawable.launcher_back, "Back to games");
             back.setOnClickListener(v -> onBackPressed());
             bar.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
         }
-        TextView heading = new TextView(this);
-        heading.setText(title);
-        heading.setTextSize(26);
+        TextView heading = ui.label(title, 28, LauncherUi.INK, true);
         heading.setGravity(Gravity.CENTER_VERTICAL);
         heading.setSingleLine(true);
         heading.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        heading.setTypeface(null, android.graphics.Typeface.BOLD);
+        heading.setPadding(dp(8), 0, dp(8), 0);
         bar.addView(heading, new LinearLayout.LayoutParams(0, dp(56), 1));
         if (destination.equals("library")) {
-            Button menu = new Button(this);
-            menu.setText("⋮");
-            menu.setContentDescription("Library options");
+            ImageButton menu = ui.icon(R.drawable.launcher_more, "Library options");
             menu.setOnClickListener(v -> libraryMenu(menu));
             bar.addView(menu, new LinearLayout.LayoutParams(dp(48), dp(48)));
         }
         content.addView(bar);
+        LinearLayout.LayoutParams barParams = (LinearLayout.LayoutParams) bar.getLayoutParams();
+        barParams.bottomMargin = dp(16);
+        if (Build.VERSION.SDK_INT >= 26) {
+            getWindow().setNavigationBarColor(LauncherUi.BACKGROUND);
+            getWindow().getDecorView().setSystemUiVisibility(android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+                    | android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        }
     }
 
     private void showLibrary() {
@@ -182,7 +188,7 @@ public class SettingsActivity extends Activity {
                         text("No games yet. Put game folders in " + library.gamesDirectory() + ", or add a folder from elsewhere.");
                     }
                     for (File game : games) gameRow(game);
-                    button("Add game", () -> browseFolder(false));
+                    button(games.isEmpty() ? "Add your first game" : "Add game", () -> browseFolder(false), true);
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> {
@@ -220,16 +226,42 @@ public class SettingsActivity extends Activity {
         String name = library.displayName(game);
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        Button play = new Button(this);
-        play.setAllCaps(false);
-        play.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        play.setText(name);
+        row.setBackground(ui.shape(LauncherUi.SURFACE, 20, true));
+        row.setClipToOutline(true);
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
+        cardParams.bottomMargin = dp(12);
+        row.setLayoutParams(cardParams);
+        LinearLayout play = new LinearLayout(this);
+        play.setGravity(Gravity.CENTER_VERTICAL);
+        play.setPadding(dp(16), dp(16), dp(8), dp(16));
+        play.setMinimumHeight(dp(88));
+        play.setBackground(ui.ripple(android.graphics.Color.TRANSPARENT, 20, false));
+        play.setFocusable(true);
         play.setContentDescription("Play " + name);
+        ImageView badge = new ImageView(this);
+        badge.setImageResource(R.drawable.launcher_play);
+        badge.setPadding(dp(10), dp(10), dp(10), dp(10));
+        badge.setBackground(ui.shape(LauncherUi.SOFT, 14, false));
+        badge.setImportantForAccessibility(android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        play.addView(badge, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        copy.setPadding(dp(14), 0, 0, 0);
+        TextView title = ui.label(name, 18, LauncherUi.INK, true);
+        title.setMaxLines(2);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        title.setImportantForAccessibility(android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        copy.addView(title);
+        TextView path = ui.label(game.getAbsolutePath(), 12, LauncherUi.MUTED, false);
+        path.setSingleLine(true);
+        path.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+        path.setPadding(0, dp(6), 0, 0);
+        path.setImportantForAccessibility(android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        copy.addView(path);
+        play.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
         play.setOnClickListener(v -> launch(game));
-        row.addView(play, new LinearLayout.LayoutParams(0, dp(64), 1));
-        Button more = new Button(this);
-        more.setText("⋮");
-        more.setContentDescription("Options for " + name);
+        row.addView(play, new LinearLayout.LayoutParams(0, -2, 1));
+        ImageButton more = ui.icon(R.drawable.launcher_more, "Options for " + name);
         more.setOnClickListener(v -> {
             PopupMenu menu = new PopupMenu(this, more);
             menu.getMenu().add("Game settings");
@@ -252,7 +284,9 @@ public class SettingsActivity extends Activity {
             });
             menu.show();
         });
-        row.addView(more, new LinearLayout.LayoutParams(dp(48), dp(56)));
+        LinearLayout.LayoutParams moreParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        moreParams.rightMargin = dp(8);
+        row.addView(more, moreParams);
         content.addView(row);
     }
 
@@ -292,12 +326,18 @@ public class SettingsActivity extends Activity {
         path.setText(initial.getAbsolutePath());
         box.addView(path);
         LinearLayout navigation = new LinearLayout(this);
-        Button up = new Button(this); up.setText("Up");
-        Button go = new Button(this); go.setText("Go to path");
-        navigation.addView(up); navigation.addView(go);
+        Button up = ui.action("Up", false);
+        Button go = ui.action("Go to path", false);
+        LinearLayout.LayoutParams upParams = new LinearLayout.LayoutParams(0, -2, 1);
+        upParams.topMargin = dp(12); upParams.rightMargin = dp(8);
+        navigation.addView(up, upParams);
+        LinearLayout.LayoutParams goParams = new LinearLayout.LayoutParams(0, -2, 1);
+        goParams.topMargin = dp(12);
+        navigation.addView(go, goParams);
         box.addView(navigation);
         ListView list = new ListView(this);
-        box.addView(list, new LinearLayout.LayoutParams(-1, dp(280)));
+        int listHeight = Math.max(dp(96), Math.min(dp(280), getResources().getDisplayMetrics().heightPixels - dp(300)));
+        box.addView(list, new LinearLayout.LayoutParams(-1, listHeight));
         File[] current = {initial};
         List<File> children = new ArrayList<>();
         Runnable refresh = () -> {
@@ -393,15 +433,16 @@ public class SettingsActivity extends Activity {
             });
             heading("Diagnostics");
             trace = new Switch(this);
+            ui.styleSwitch(trace);
             trace.setText("Record Ruby exception backtraces");
             trace.setChecked(profile.optBoolean("traceExceptions", true));
             content.addView(trace);
             text("Logs stay on this device until you export them. Tracing also records exceptions the game handles normally; turn it off if it affects performance. The latest five sessions are kept.");
             text("Shared mkxp.json supplies defaults; this game's mkxp.json overrides them. Save-directory overrides may still take precedence in the engine. Original config files are preserved.");
-            button("Save", () -> {
+            button("Save settings", () -> {
                 try { library.saveProfile(game, currentProfile()); showLibrary(); toast("Game settings saved"); }
                 catch (Exception e) { error(e); }
-            });
+            }, true);
             button("Reset game settings", () -> new AlertDialog.Builder(this).setTitle("Reset this game?")
                     .setMessage("Return to the original config's settings and preload selections.")
                     .setNegativeButton("Cancel", null).setPositiveButton("Reset", (d, w) -> {
@@ -425,8 +466,8 @@ public class SettingsActivity extends Activity {
 
     private void toggle(String key, String title, boolean fallback, JSONObject base, JSONObject overrides) {
         Switch view = new Switch(this);
+        ui.styleSwitch(view);
         view.setText(title);
-        view.setPadding(0, dp(10), 0, dp(10));
         view.setChecked(overrides == null ? base.optBoolean(key, fallback) : overrides.optBoolean(key, base.optBoolean(key, fallback)));
         display.put(key, view);
         content.addView(view);
@@ -436,30 +477,54 @@ public class SettingsActivity extends Activity {
         parent.removeAllViews();
         for (int i = 0; i < scripts.size(); i++) {
             ScriptRow script = scripts.get(i);
-            LinearLayout row = new LinearLayout(this);
-            row.setGravity(Gravity.CENTER_VERTICAL);
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setBackground(ui.shape(LauncherUi.SURFACE, 20, true));
+            LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
+            cardParams.bottomMargin = dp(12);
+            card.setLayoutParams(cardParams);
             Switch toggle = new Switch(this);
+            ui.styleSwitch(toggle);
+            toggle.setBackground(ui.ripple(android.graphics.Color.TRANSPARENT, 20, false));
+            toggle.setLayoutParams(new LinearLayout.LayoutParams(-1, -2));
             File file = new File(script.path);
             toggle.setText(file.getName() + (file.isFile() ? "" : " (missing)"));
+            toggle.setMaxLines(2);
+            toggle.setEllipsize(android.text.TextUtils.TruncateAt.END);
             toggle.setChecked(script.enabled);
             toggle.setOnCheckedChangeListener((v, checked) -> script.enabled = checked);
-            row.addView(toggle, new LinearLayout.LayoutParams(0, -2, 1));
+            card.addView(toggle);
+            TextView description = ui.label(scriptDescription(file.getName()), 14, LauncherUi.MUTED, false);
+            description.setPadding(dp(16), 0, dp(16), dp(4));
+            card.addView(description);
+            LinearLayout footer = new LinearLayout(this);
+            footer.setGravity(Gravity.CENTER_VERTICAL);
+            footer.setPadding(dp(8), dp(4), dp(8), dp(8));
+            String source = "Custom path";
+            try {
+                File folder = file.getParentFile().getCanonicalFile();
+                if (folder.equals(GameLibrary.child(editing, "scripts").getCanonicalFile())) source = "Game scripts";
+                else if (folder.equals(new File(StartupConfig.directory(), "scripts").getCanonicalFile())) source = "Shared scripts";
+            } catch (java.io.IOException ignored) {}
+            TextView location = ui.label(source + " · view path", 12, LauncherUi.ACCENT, true);
+            location.setPadding(dp(8), 0, 0, 0);
+            location.setGravity(Gravity.CENTER_VERTICAL);
+            location.setMinimumHeight(dp(48));
+            location.setBackground(ui.ripple(android.graphics.Color.TRANSPARENT, 12, false));
+            location.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle(file.getName())
+                    .setMessage(script.path).setPositiveButton("OK", null).show());
+            footer.addView(location, new LinearLayout.LayoutParams(0, -2, 1));
             final int position = i;
             for (int direction : new int[]{-1, 1}) {
-                Button move = new Button(this);
-                move.setText(direction < 0 ? "↑" : "↓");
-                move.setContentDescription((direction < 0 ? "Move earlier: " : "Move later: ") + file.getName());
+                ImageButton move = ui.icon(direction < 0 ? R.drawable.launcher_up : R.drawable.launcher_down,
+                        (direction < 0 ? "Move earlier: " : "Move later: ") + file.getName());
                 move.setEnabled(position + direction >= 0 && position + direction < scripts.size());
+                move.setAlpha(move.isEnabled() ? 1f : 0.3f);
                 move.setOnClickListener(v -> { Collections.swap(scripts, position, position + direction); renderScripts(parent); });
-                row.addView(move, new LinearLayout.LayoutParams(dp(44), dp(48)));
+                footer.addView(move, new LinearLayout.LayoutParams(dp(48), dp(48)));
             }
-            parent.addView(row);
-            TextView description = new TextView(this);
-            description.setText(scriptDescription(file.getName()) + "\n" + script.path);
-            description.setTextSize(12);
-            description.setPadding(0, 0, 0, dp(14));
-            description.setTextIsSelectable(true);
-            parent.addView(description);
+            card.addView(footer);
+            parent.addView(card);
         }
     }
 
@@ -562,13 +627,21 @@ public class SettingsActivity extends Activity {
         ScriptRow(String path, boolean enabled) { this.path = path; this.enabled = enabled; }
     }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
-    private void heading(String title) { TextView view = text(title); view.setTextSize(20); view.setTypeface(null, 1); view.setPadding(0, dp(20), 0, dp(8)); }
+    private void heading(String title) {
+        TextView view = ui.label(title, 18, LauncherUi.INK, true);
+        view.setPadding(dp(4), dp(24), 0, dp(12));
+        content.addView(view);
+    }
     private TextView text(String value) {
-        TextView view = new TextView(this); view.setText(value); view.setTextSize(15);
-        view.setTextIsSelectable(true); view.setPadding(0, dp(4), 0, dp(12)); content.addView(view); return view;
+        TextView view = ui.label(value, 14, LauncherUi.MUTED, false);
+        view.setLineSpacing(dp(3), 1f);
+        view.setTextIsSelectable(true); view.setPadding(dp(4), dp(4), dp(4), dp(12)); content.addView(view); return view;
     }
     private Button button(String title, Runnable action) {
-        Button view = new Button(this); view.setText(title); content.addView(view);
+        return button(title, action, false);
+    }
+    private Button button(String title, Runnable action, boolean primary) {
+        Button view = ui.action(title, primary); content.addView(view);
         view.setOnClickListener(v -> action.run()); return view;
     }
     private void toast(String message) { Toast.makeText(this, message, Toast.LENGTH_SHORT).show(); }
