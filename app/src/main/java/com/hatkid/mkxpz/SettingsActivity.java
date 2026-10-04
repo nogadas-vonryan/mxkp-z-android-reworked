@@ -466,6 +466,7 @@ public class SettingsActivity extends Activity {
             CheckBox toggle = new CheckBox(this);
             ui.styleToggle(toggle);
             toggle.setBackground(ui.interactive(android.graphics.Color.TRANSPARENT, LauncherUi.CORNER, false));
+            toggle.setPadding(dp(8), dp(6), dp(8), dp(6));
             toggle.setLayoutParams(new LinearLayout.LayoutParams(-1, -2));
             File file = new File(script.path);
             toggle.setText(file.getName() + (file.isFile() ? "" : " (missing)"));

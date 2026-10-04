@@ -113,11 +113,11 @@ final class LauncherUi {
         view.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
         view.setMinimumHeight(dp(48));
         view.setGravity(Gravity.CENTER_VERTICAL);
-        view.setPadding(dp(8), dp(6), dp(8), dp(6));
         view.setButtonDrawable(R.drawable.launcher_checkbox);
         view.setButtonTintList(null);
         view.setCompoundDrawablePadding(dp(8));
         view.setBackground(interactive(SURFACE, CORNER, false));
+        view.setPadding(dp(8), dp(6), dp(8), dp(6));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
         params.bottomMargin = dp(3);
         view.setLayoutParams(params);
