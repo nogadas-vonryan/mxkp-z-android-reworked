@@ -52,6 +52,30 @@ public final class LibrarySessionTest {
         library.rename(b, "  ");
         check(new GameLibrary(context).displayName(b).equals("Beta"), "Resetting the custom name did not restore the original title");
 
+        File customScript = new File(external, "scripts/local-custom.rb");
+        File sameName = new File(external, "scripts/load-zlib.rb");
+        File uppercaseScript = new File(external, "scripts/EXTRA.RB");
+        write(customScript, "# game-local custom script\n");
+        write(sameName, "# local script with a shared name\n");
+        write(uppercaseScript, "# uppercase extension\n");
+        write(new File(external, "scripts/notes.txt"), "Not a Ruby script");
+        JSONObject emptyProfile = new JSONObject().put("scripts", new JSONArray()).put("traceExceptions", false);
+        java.util.List<String> choices = LaunchSession.scriptChoices(external, new JSONObject(), emptyProfile);
+        check(choices.contains(customScript.getCanonicalPath()) && choices.contains(uppercaseScript.getCanonicalPath()), "Scripts in a custom game folder were not discovered");
+        check(choices.contains(sameName.getCanonicalPath()) && choices.contains(shared.getCanonicalPath()), "Game-local and shared scripts with the same name were conflated");
+        check(!choices.contains(new File(external, "scripts/notes.txt").getCanonicalPath()), "Non-Ruby file was discovered as a script");
+        check(java.util.Collections.frequency(LaunchSession.scriptChoices(root, new JSONObject(), emptyProfile), shared.getCanonicalPath()) == 1, "Overlapping script directories produced duplicate entries");
+        File laterScript = new File(external, "scripts/added-later.rb");
+        write(laterScript, "# added after the first scan\n");
+        JSONArray savedOrder = new JSONArray().put(customScript.getCanonicalPath()).put(shared.getCanonicalPath());
+        JSONObject orderedProfile = new JSONObject().put("scripts", savedOrder);
+        java.util.List<String> refreshed = LaunchSession.scriptChoices(external, new JSONObject(), orderedProfile);
+        check(refreshed.contains(laterScript.getCanonicalPath()), "Refreshing did not discover a newly added script");
+        check(refreshed.get(0).equals(customScript.getCanonicalPath()) && refreshed.get(1).equals(shared.getCanonicalPath()), "Discovery changed the enabled script order");
+        check(savedOrder.length() == 2, "Discovery enabled a new script or modified the profile");
+        library.saveProfile(external, emptyProfile);
+        check(new LaunchSession(context, external, library).options.getJSONArray("preloadScript").length() == 0, "Discovered scripts were enabled automatically");
+
         File rootConfig = new File(root, "mkxp.json");
         File gameConfig = new File(a, "mkxp.json");
         write(rootConfig, "{\"fullscreen\":false,\"unknown\":{\"keep\":17},\"bindingNames\":{\"c\":\"Use\",\"x\":\"Jump\"},\"preloadScript\":[\"scripts/load-zlib.rb\"]}");

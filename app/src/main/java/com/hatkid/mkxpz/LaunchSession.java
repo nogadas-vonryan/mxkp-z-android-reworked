@@ -127,12 +127,16 @@ final class LaunchSession {
         // Keep disabled original entries available too.
         JSONArray originals = preloads(options);
         for (int i = 0; i < originals.length(); i++) choices.add(resolveScript(game, originals.getString(i)));
-        File[] shared = new File(StartupConfig.directory(), "scripts").listFiles(f -> f.isFile() && f.getName().endsWith(".rb"));
-        if (shared != null) {
-            Arrays.sort(shared, (left, right) -> left.getName().compareTo(right.getName()));
-            for (File file : shared) choices.add(file.getCanonicalPath());
-        }
+        discoverScripts(GameLibrary.child(game, "scripts"), choices);
+        discoverScripts(new File(StartupConfig.directory(), "scripts"), choices);
         return new ArrayList<>(choices);
+    }
+
+    private static void discoverScripts(File folder, Set<String> choices) throws IOException {
+        File[] files = folder.listFiles(f -> f.isFile() && f.getName().toLowerCase(Locale.ROOT).endsWith(".rb"));
+        if (files == null) return;
+        Arrays.sort(files, (left, right) -> left.getName().compareToIgnoreCase(right.getName()));
+        for (File file : files) choices.add(file.getCanonicalPath());
     }
 
     private static void prune(File current) {

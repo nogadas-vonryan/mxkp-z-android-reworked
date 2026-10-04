@@ -356,7 +356,7 @@ public class SettingsActivity extends Activity {
             toggle("integerScalingActive", "Integer scaling", false, base, overrides);
             toggle("subImageFix", "Texture workaround", false, base, overrides);
             heading("Preload scripts");
-            text("Enable the scripts this game needs. They run in the order shown; use the arrows to reorder them. Add your own .rb files to " + new File(StartupConfig.directory(), "scripts") + ".");
+            text("Scripts run in the order shown. Ruby files in this game's scripts folder and the shared mkxp-z/scripts folder appear here automatically.");
             JSONArray enabled = profile.optJSONArray("scripts");
             if (enabled == null) enabled = LaunchSession.preloads(base);
             Set<String> checked = new LinkedHashSet<>();
@@ -366,6 +366,18 @@ public class SettingsActivity extends Activity {
             content.addView(rows);
             for (String path : LaunchSession.scriptChoices(game, base, profile)) scripts.add(new ScriptRow(path, checked.contains(path)));
             renderScripts(rows);
+            button("Refresh scripts", () -> {
+                try {
+                    Set<String> known = new LinkedHashSet<>();
+                    for (ScriptRow row : scripts) known.add(row.path);
+                    int added = 0;
+                    for (String path : LaunchSession.scriptChoices(game, base, currentProfile())) {
+                        if (known.add(path)) { scripts.add(new ScriptRow(path, false)); added++; }
+                    }
+                    renderScripts(rows);
+                    toast(added == 0 ? "Scripts are up to date" : added + " new script" + (added == 1 ? "" : "s") + " found");
+                } catch (Exception e) { error(e); }
+            });
             button("Add script path", () -> {
                 EditText path = new EditText(this);
                 path.setHint("/storage/emulated/0/mkxp-z/scripts/custom.rb");
@@ -373,7 +385,7 @@ public class SettingsActivity extends Activity {
                         .setNegativeButton("Cancel", null).setPositiveButton("Add", (d, w) -> {
                             try {
                                 String resolved = LaunchSession.resolveScript(game, path.getText().toString().trim());
-                                if (!new File(resolved).isFile() || !resolved.endsWith(".rb")) throw new java.io.IOException("Choose an existing .rb file.");
+                                if (!new File(resolved).isFile() || !resolved.toLowerCase(Locale.ROOT).endsWith(".rb")) throw new java.io.IOException("Choose an existing .rb file.");
                                 for (ScriptRow row : scripts) if (row.path.equals(resolved)) { row.enabled = true; renderScripts(rows); return; }
                                 scripts.add(new ScriptRow(resolved, true)); renderScripts(rows);
                             } catch (Exception e) { error(e); }
