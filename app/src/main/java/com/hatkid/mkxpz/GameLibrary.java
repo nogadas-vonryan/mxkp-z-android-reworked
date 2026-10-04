@@ -72,6 +72,28 @@ final class GameLibrary {
         save();
     }
 
+    String displayName(File game) {
+        JSONObject names = state.optJSONObject("names");
+        if (names != null) {
+            try {
+                String name = names.optString(game.getCanonicalPath(), "").trim();
+                if (!name.isEmpty()) return name;
+            } catch (IOException ignored) {}
+        }
+        return title(game);
+    }
+
+    void rename(File game, String name) throws Exception {
+        JSONObject names = state.optJSONObject("names");
+        if (names == null) names = new JSONObject();
+        String path = game.getCanonicalPath();
+        name = name.trim();
+        if (name.isEmpty()) names.remove(path);
+        else names.put(path, name);
+        state.put("names", names);
+        save();
+    }
+
     List<File> games() throws Exception {
         Set<String> candidates = paths("added");
         File folder = gamesDirectory();
@@ -94,7 +116,10 @@ final class GameLibrary {
         candidates.removeAll(paths("hidden"));
         List<File> games = new ArrayList<>();
         for (String path : candidates) games.add(new File(path));
-        Collections.sort(games, (left, right) -> title(left).compareToIgnoreCase(title(right)));
+        Collections.sort(games, (left, right) -> {
+            int order = displayName(left).compareToIgnoreCase(displayName(right));
+            return order != 0 ? order : left.getPath().compareTo(right.getPath());
+        });
         return games;
     }
 

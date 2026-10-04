@@ -40,6 +40,17 @@ public final class LibrarySessionTest {
         library.setGamesDirectory(new File(work, "elsewhere"));
         check(library.games().size() == 2, "Custom library folder scanning failed");
         library.setGamesDirectory(new File(root, "games"));
+        String iniBeforeRename = read(new File(b, "Game.ini"));
+        library.rename(new File(b, "."), "  Aardvark custom name  ");
+        check(library.displayName(b).equals("Aardvark custom name"), "Custom name was not trimmed or associated with the canonical path");
+        check(library.games().get(0).equals(b.getCanonicalFile()), "Games were not sorted by their custom names");
+        library = new GameLibrary(context);
+        check(library.displayName(b).equals("Aardvark custom name"), "Custom name did not persist");
+        library.saveProfile(b, new JSONObject());
+        check(library.displayName(b).equals("Aardvark custom name"), "Resetting settings removed the custom name");
+        check(iniBeforeRename.equals(read(new File(b, "Game.ini"))), "Renaming modified Game.ini");
+        library.rename(b, "  ");
+        check(new GameLibrary(context).displayName(b).equals("Beta"), "Resetting the custom name did not restore the original title");
 
         File rootConfig = new File(root, "mkxp.json");
         File gameConfig = new File(a, "mkxp.json");

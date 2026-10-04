@@ -217,27 +217,30 @@ public class SettingsActivity extends Activity {
     }
 
     private void gameRow(File game) {
+        String name = library.displayName(game);
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
         Button play = new Button(this);
         play.setAllCaps(false);
         play.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        play.setText(GameLibrary.title(game));
-        play.setContentDescription("Play " + GameLibrary.title(game));
+        play.setText(name);
+        play.setContentDescription("Play " + name);
         play.setOnClickListener(v -> launch(game));
         row.addView(play, new LinearLayout.LayoutParams(0, dp(64), 1));
         Button more = new Button(this);
         more.setText("⋮");
-        more.setContentDescription("Options for " + GameLibrary.title(game));
+        more.setContentDescription("Options for " + name);
         more.setOnClickListener(v -> {
             PopupMenu menu = new PopupMenu(this, more);
             menu.getMenu().add("Game settings");
+            menu.getMenu().add("Rename");
             menu.getMenu().add("Show folder");
             menu.getMenu().add("Remove from library");
             menu.setOnMenuItemClickListener(item -> {
                 switch (item.getTitle().toString()) {
                     case "Game settings": showSettings(game); break;
-                    case "Show folder": new AlertDialog.Builder(this).setTitle(GameLibrary.title(game))
+                    case "Rename": renameGame(game); break;
+                    case "Show folder": new AlertDialog.Builder(this).setTitle(name)
                             .setMessage(game.getAbsolutePath()).setPositiveButton("OK", null).show(); break;
                     case "Remove from library": new AlertDialog.Builder(this).setTitle("Remove from library?")
                             .setMessage("The game files and saves will stay on your device.")
@@ -251,6 +254,31 @@ public class SettingsActivity extends Activity {
         });
         row.addView(more, new LinearLayout.LayoutParams(dp(48), dp(56)));
         content.addView(row);
+    }
+
+    private void renameGame(File game) {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        input.setText(library.displayName(game));
+        input.selectAll();
+        LinearLayout box = new LinearLayout(this);
+        box.setPadding(dp(24), dp(8), dp(24), 0);
+        box.addView(input, new LinearLayout.LayoutParams(-1, -2));
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Rename game").setView(box)
+                .setNegativeButton("Cancel", null).setNeutralButton("Use original", null)
+                .setPositiveButton("Save name", null).create();
+        dialog.setOnShowListener(d -> {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                try { library.rename(game, input.getText().toString()); dialog.dismiss(); showLibrary(); }
+                catch (Exception e) { error(e); }
+            });
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
+                try { library.rename(game, ""); dialog.dismiss(); showLibrary(); }
+                catch (Exception e) { error(e); }
+            });
+        });
+        dialog.show();
     }
 
     private void browseFolder(boolean collection) {
@@ -313,9 +341,10 @@ public class SettingsActivity extends Activity {
 
     private void showSettings(File game) {
         editing = game;
-        page(GameLibrary.title(game), "settings");
+        try { if (library == null) library = new GameLibrary(this); }
+        catch (Exception e) { page(GameLibrary.title(game), "settings"); error(e); return; }
+        page(library.displayName(game), "settings");
         try {
-            if (library == null) library = new GameLibrary(this);
             JSONObject base = LaunchSession.baseOptions(game);
             JSONObject profile = draft != null ? draft : library.profile(game);
             draft = null;
