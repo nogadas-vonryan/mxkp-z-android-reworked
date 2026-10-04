@@ -50,7 +50,7 @@
         android:requestLegacyExternalStorage="true"
     >
         <activity android:name=".SettingsActivity" android:exported="true"
-            android:launchMode="singleTask" android:theme="@style/SettingsTheme">
+            android:launchMode="singleTop" android:alwaysRetainTaskState="true" android:theme="@style/SettingsTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

@@ -71,8 +71,20 @@ final class StartupConfig {
     }
 
     static byte[] read(File source) throws IOException {
-        try (InputStream stream = new AtomicFile(source).openRead();
-             ByteArrayOutputStream result = new ByteArrayOutputStream()) {
+        // Ordinary reads must not interpret a user's .bak file as an AtomicFile journal.
+        try (InputStream stream = new FileInputStream(source)) { return readStream(stream); }
+    }
+
+    static byte[] readAtomic(File source) throws IOException {
+        try (InputStream stream = new AtomicFile(source).openRead()) { return readStream(stream); }
+    }
+
+    static boolean existsAtomic(File source) {
+        return source.isFile() || new File(source.getPath() + ".bak").isFile();
+    }
+
+    private static byte[] readStream(InputStream stream) throws IOException {
+        try (ByteArrayOutputStream result = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[4096];
             int count;
             while ((count = stream.read(buffer)) != -1) result.write(buffer, 0, count);
@@ -80,7 +92,7 @@ final class StartupConfig {
         }
     }
 
-    private static void write(File target, byte[] bytes) throws IOException {
+    static void write(File target, byte[] bytes) throws IOException {
         AtomicFile atomic = new AtomicFile(target);
         FileOutputStream stream = null;
         try {

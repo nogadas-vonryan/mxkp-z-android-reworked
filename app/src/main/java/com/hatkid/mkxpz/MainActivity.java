@@ -103,6 +103,17 @@ public class MainActivity extends SDLActivity
     @Override
     protected void onCreate(Bundle savedInstanceState)
     {
+        String session = getIntent().getStringExtra("sessionDirectory");
+        if (session != null) {
+            try {
+                File directory = new File(session).getCanonicalFile();
+                File parent = new File(getFilesDir(), "sessions").getCanonicalFile();
+                if (parent.equals(directory.getParentFile()) && new File(directory, "mkxp.json").isFile()) {
+                    GAME_PATH = directory.getAbsolutePath();
+
+                }
+            } catch (java.io.IOException e) { Log.e(TAG, "Invalid launch session", e); }
+        }
         super.onCreate(savedInstanceState);
 
         mStorageManager = (StorageManager) getSystemService(STORAGE_SERVICE);
@@ -141,22 +152,6 @@ public class MainActivity extends SDLActivity
 
         if (mLayout != null) {
             mGamepad.attachTo(this, mLayout);
-            android.widget.Button settings = new android.widget.Button(this);
-            settings.setText("Settings");
-            settings.setContentDescription("Stop game and open settings");
-            android.widget.RelativeLayout.LayoutParams position = new android.widget.RelativeLayout.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
-            position.addRule(android.widget.RelativeLayout.ALIGN_PARENT_TOP);
-            position.addRule(android.widget.RelativeLayout.CENTER_HORIZONTAL);
-            mLayout.addView(settings, position);
-            settings.setOnClickListener(view -> new android.app.AlertDialog.Builder(this)
-                    .setTitle("Open settings?")
-                    .setMessage("This stops the game. Save your progress in the game first.")
-                    .setNegativeButton("Keep playing", null)
-                    .setPositiveButton("Open settings", (dialog, which) -> {
-                        startActivity(new Intent(this, SettingsActivity.class));
-                        finish();
-                    }).show());
         }
     }
 
