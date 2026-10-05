@@ -139,7 +139,7 @@ public class SettingsActivity extends Activity {
         heading.setPadding(dp(8), 0, dp(8), 0);
         bar.addView(heading, new LinearLayout.LayoutParams(0, dp(56), 1));
         if (destination.equals("library")) {
-            ImageButton menu = ui.icon(R.drawable.launcher_more, "Library options");
+            ImageButton menu = ui.icon(R.drawable.launcher_settings, "Library options");
             menu.setOnClickListener(v -> libraryMenu(menu));
             bar.addView(menu, new LinearLayout.LayoutParams(dp(48), dp(48)));
         }
