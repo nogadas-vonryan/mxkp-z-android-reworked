@@ -51,7 +51,7 @@ final class GameLibrary {
     }
 
     void add(File game) throws Exception {
-        if (!isGame(game)) throw new IOException("Choose a folder containing Game.exe.");
+        if (!isGame(game)) throw new IOException("Choose an RPG Maker game folder containing its executable and game files.");
         Set<String> paths = paths("added");
         paths.add(game.getCanonicalPath());
         state.put("added", new JSONArray(paths));
@@ -153,7 +153,32 @@ final class GameLibrary {
     }
 
     static boolean isGame(File directory) {
-        return directory.isDirectory() && child(directory, "Game.exe").isFile();
+        return executableName(directory) != null;
+    }
+
+    // Commercial releases can name the executable and archive after the game.
+    // Require a matching INI/archive pair to avoid detecting installers as games.
+    static String executableName(File directory) {
+        if (!directory.isDirectory()) return null;
+        if (child(directory, "Game.exe").isFile()) return "Game";
+        File[] files = directory.listFiles();
+        if (files == null) return null;
+        java.util.Arrays.sort(files, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+        String match = null;
+        for (File file : files) {
+            String name = file.getName();
+            if (!file.isFile() || !name.toLowerCase(Locale.ROOT).endsWith(".exe")) continue;
+            String stem = name.substring(0, name.length() - 4);
+            if (!child(directory, stem + ".ini").isFile()) continue;
+            boolean archive = false;
+            for (String extension : new String[]{".rgssad", ".rgss2a", ".rgss3a"})
+                archive |= child(directory, stem + extension).isFile();
+            if (!archive) continue;
+            // Ambiguous installations require the usual Game.exe layout.
+            if (match != null) return null;
+            match = stem;
+        }
+        return match;
     }
 
     static File child(File directory, String name) {
@@ -167,7 +192,8 @@ final class GameLibrary {
     }
 
     static String title(File directory) {
-        File ini = child(directory, "Game.ini");
+        String executable = executableName(directory);
+        File ini = child(directory, (executable == null ? "Game" : executable) + ".ini");
         if (ini.isFile() && ini.length() < 65536) {
             try {
                 boolean gameSection = false;

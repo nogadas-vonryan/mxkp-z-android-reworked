@@ -111,6 +111,21 @@ public final class LibrarySessionTest {
         check(other.options.getJSONArray("preloadScript").length() == 2, "Script selection leaked to another game");
         check(rootBefore.equals(read(rootConfig)) && gameBefore.equals(read(gameConfig)), "Original configs were modified");
 
+        File moon = new File(work, "GOG/To The Moon");
+        write(new File(moon, "To the Moon.exe"), "");
+        write(new File(moon, "To the Moon.ini"), "[Game]\nTitle=To the Moon\nScripts=Data\\Scripts.rxdata\n");
+        write(new File(moon, "To the Moon.rgssad"), "archive fixture");
+        write(new File(moon, "unins000.exe"), "installer fixture");
+        check(GameLibrary.isGame(moon), "Named executable release was rejected");
+        check(GameLibrary.title(moon).equals("To the Moon"), "Named INI title was not read");
+        check(LaunchSession.baseOptions(moon).getString("execName").equals("To the Moon"), "Named archive was not selected");
+        File installer = new File(work, "installer-only");
+        write(new File(installer, "setup.exe"), "");
+        write(new File(installer, "setup.ini"), "[Setup]\n");
+        check(!GameLibrary.isGame(installer), "Installer-only folder was detected as a game");
+        write(new File(moon, "mkxp.json"), "{\"execName\":\"Explicit override\"}");
+        check(LaunchSession.baseOptions(moon).getString("execName").equals("Explicit override"), "Executable inference replaced an explicit config");
+
         File unicodeGame = game(new File(work, "Pokémon/日本語"), "Pokémon", "Game.exe");
         File unicodeConfig = new File(unicodeGame, "mkxp.json");
         JSONObject unicodeOptions = new JSONObject()

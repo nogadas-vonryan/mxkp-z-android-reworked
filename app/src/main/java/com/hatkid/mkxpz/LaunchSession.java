@@ -14,7 +14,7 @@ final class LaunchSession {
     final JSONObject options;
 
     LaunchSession(Context context, File game, GameLibrary library) throws Exception {
-        if (!GameLibrary.isGame(game)) throw new IOException("Game.exe is missing from " + game);
+        if (!GameLibrary.isGame(game)) throw new IOException("No supported RPG Maker game found in " + game);
         options = baseOptions(game);
         JSONObject profile = library.profile(game);
         JSONObject display = profile.optJSONObject("display");
@@ -89,6 +89,8 @@ final class LaunchSession {
 
     static JSONObject baseOptions(File game) throws Exception {
         JSONObject result = new JSONObject();
+        String executable = GameLibrary.executableName(game);
+        if (executable != null) result.put("execName", executable);
         File root = new File(StartupConfig.directory(), "mkxp.json");
         File own = new File(game, "mkxp.json");
         if (root.isFile()) merge(result, readConfig(root));
