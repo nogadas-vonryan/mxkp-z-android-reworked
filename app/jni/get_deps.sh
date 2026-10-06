@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # This script downloads/git clones project dependencies
 # such as libogg, SDL2, Ruby, etc.
@@ -20,7 +21,7 @@ fi
 # Xiph libtheora
 if [[ ! -d "libtheora" ]]; then
   echo "Downloading libtheora..."
-  wget -q https://ftp.osuosl.org/pub/xiph/releases/theora/libtheora-1.1.1.tar.gz
+  wget --tries=3 --timeout=30 https://ftp.osuosl.org/pub/xiph/releases/theora/libtheora-1.1.1.tar.gz
   tar -xzf libtheora-1.1.1.tar.gz
   mv libtheora-1.1.1 libtheora
   rm -f libtheora-1.1.1.tar.gz
@@ -29,10 +30,20 @@ fi
 # GNU libiconv
 if [[ ! -d "libiconv" ]]; then
   echo "Downloading libiconv..."
-  wget -q https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.17.tar.gz
+  if ! wget --tries=3 --timeout=30 -O libiconv-1.17.tar.gz \
+    https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.17.tar.gz; then
+    echo "Primary GNU download failed; trying the GNU mirror redirect..." >&2
+    wget --tries=3 --timeout=30 -O libiconv-1.17.tar.gz \
+      https://ftpmirror.gnu.org/libiconv/libiconv-1.17.tar.gz
+  fi
   tar -xzf libiconv-1.17.tar.gz
   mv libiconv-1.17 libiconv
   rm -f libiconv-1.17.tar.gz
+fi
+
+if [[ ! -f "libiconv/configure" ]]; then
+  echo "libiconv/configure is missing. Restore or remove the incomplete libiconv source directory, then rerun get_deps.sh." >&2
+  exit 1
 fi
 
 # Freedesktop uchardet
