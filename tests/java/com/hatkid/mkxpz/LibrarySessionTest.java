@@ -119,6 +119,14 @@ public final class LibrarySessionTest {
         check(GameLibrary.isGame(moon), "Named executable release was rejected");
         check(GameLibrary.title(moon).equals("To the Moon"), "Named INI title was not read");
         check(LaunchSession.baseOptions(moon).getString("execName").equals("To the Moon"), "Named archive was not selected");
+        write(new File(moon, "mkxp.json"), "{\"preloadScript\":[\"scripts/mkxp-wrap.rb\",\"mkxp/preload/ruby18_comp.rb\",\"mkxp/preload/win32_wrap.rb\",\"mkxp/preload/utils.dll.rb\"]}");
+        for (String name : new String[]{"ruby18_comp.rb", "win32_wrap.rb", "utils.dll.rb"})
+            write(new File(moon, "mkxp/preload/" + name), "# shipped game script\n");
+        library.add(moon);
+        LaunchSession moonSession = new LaunchSession(context, moon, library);
+        JSONArray moonPreloads = moonSession.options.getJSONArray("preloadScript");
+        check(moonPreloads.getString(1).equals(new File(root, "scripts/mkxp-wrap.rb").getCanonicalPath()), "Legacy MKXP wrapper did not precede game preloads");
+        check(moonPreloads.getString(3).equals(new File(moon, "mkxp/preload/win32_wrap.rb").getCanonicalPath()), "Game Win32 shim was not resolved");
         File installer = new File(work, "installer-only");
         write(new File(installer, "setup.exe"), "");
         write(new File(installer, "setup.ini"), "[Setup]\n");

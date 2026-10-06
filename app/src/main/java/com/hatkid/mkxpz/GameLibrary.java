@@ -28,7 +28,7 @@ final class GameLibrary {
         if (!games.isDirectory() && !games.mkdirs()) throw new IOException("Cannot create " + games);
         File rootConfig = new File(StartupConfig.directory(), "mkxp.json");
         if (!rootConfig.exists()) StartupConfig.write(rootConfig, "{}\n".getBytes(StandardCharsets.UTF_8));
-        for (String name : new String[]{"load-zlib.rb", "fix-essentials-clock.rb", "disable-steam.rb", "disable-audio.rb"}) {
+        for (String name : new String[]{"load-zlib.rb", "fix-essentials-clock.rb", "disable-steam.rb", "disable-audio.rb", "mkxp-wrap.rb"}) {
             File target = new File(scripts, name);
             if (target.exists()) continue;
             try (java.io.InputStream input = context.getAssets().open("scripts/" + name);
