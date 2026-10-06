@@ -30,11 +30,20 @@ fi
 # GNU libiconv
 if [[ ! -d "libiconv" ]]; then
   echo "Downloading libiconv..."
-  if ! wget --tries=3 --timeout=30 -O libiconv-1.17.tar.gz \
-    https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.17.tar.gz; then
-    echo "Primary GNU download failed; trying the GNU mirror redirect..." >&2
-    wget --tries=3 --timeout=30 -O libiconv-1.17.tar.gz \
-      https://ftpmirror.gnu.org/libiconv/libiconv-1.17.tar.gz
+  downloaded=false
+  for url in \
+    https://ftp.osuosl.org/pub/gnu/libiconv/libiconv-1.17.tar.gz \
+    https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.17.tar.gz \
+    https://ftpmirror.gnu.org/libiconv/libiconv-1.17.tar.gz; do
+    if wget --tries=3 --timeout=30 -O libiconv-1.17.tar.gz "$url"; then
+      downloaded=true
+      break
+    fi
+    echo "Download failed from $url; trying the next mirror..." >&2
+  done
+  if [[ "$downloaded" != true ]]; then
+    echo "Could not download libiconv from any configured mirror." >&2
+    exit 1
   fi
   tar -xzf libiconv-1.17.tar.gz
   mv libiconv-1.17 libiconv

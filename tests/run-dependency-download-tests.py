@@ -28,7 +28,8 @@ set -eu
 printf '%s\\n' "$*" >> "$DOWNLOAD_LOG"
 case "$DOWNLOAD_MODE" in
   fail) exit 8 ;;
-  fallback) [[ "${!#}" == https://ftpmirror.gnu.org/* ]] || exit 8 ;;
+  fallback) [[ "${!#}" == https://ftp.gnu.org/* ]] || exit 8 ;;
+  final_fallback) [[ "${!#}" == https://ftpmirror.gnu.org/* ]] || exit 8 ;;
 esac
 if [[ "$DOWNLOAD_MODE" == corrupt ]]; then
   printf 'invalid archive' > libiconv-1.17.tar.gz
@@ -37,7 +38,7 @@ else
 fi
 ''')
     wget.chmod(0o755)
-    for mode in ('success', 'fallback', 'fail', 'corrupt', 'incomplete', 'existing'):
+    for mode in ('success', 'fallback', 'final_fallback', 'fail', 'corrupt', 'incomplete', 'existing'):
         work = root / mode
         work.mkdir()
         for dependency in other_dependencies:
@@ -51,7 +52,7 @@ fi
                    DOWNLOAD_MODE=mode, DOWNLOAD_FIXTURE=str(fixture), DOWNLOAD_LOG=str(log))
         result = subprocess.run(['bash', str(script)], cwd=work, env=env,
                                 text=True, capture_output=True)
-        succeeded = mode in ('success', 'fallback', 'existing')
+        succeeded = mode in ('success', 'fallback', 'final_fallback', 'existing')
         assert (result.returncode == 0) == succeeded, (mode, result.stdout, result.stderr)
         assert ('Done!' in result.stdout) == succeeded, (mode, result.stdout)
         if succeeded:
@@ -59,10 +60,14 @@ fi
         if mode == 'incomplete':
             assert 'libiconv/configure is missing' in result.stderr
         calls = log.read_text().splitlines() if log.exists() else []
-        expected = {'success': 1, 'fallback': 2, 'fail': 2, 'corrupt': 1,
+        expected = {'success': 1, 'fallback': 2, 'final_fallback': 3, 'fail': 3, 'corrupt': 1,
                     'incomplete': 0, 'existing': 0}[mode]
         assert len(calls) == expected, (mode, calls)
         if mode == 'fallback':
+            assert 'https://ftp.gnu.org/' in calls[-1]
+        if mode == 'final_fallback':
             assert 'https://ftpmirror.gnu.org/' in calls[-1]
+        if calls:
+            assert 'https://ftp.osuosl.org/' in calls[0]
         print(mode + ': passed')
 print('Dependency download failure, fallback and source-validation checks passed.')
