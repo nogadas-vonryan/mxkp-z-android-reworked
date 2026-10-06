@@ -54,7 +54,7 @@ final class LaunchSession {
         options.put("preloadScript", enabled);
         // Name game-script frames in the existing engine's exception backtraces.
         options.put("useScriptNames", true);
-        StartupConfig.write(new File(directory, "mkxp.json"), options.toString(2).getBytes(StandardCharsets.UTF_8));
+        StartupConfig.write(new File(directory, "mkxp.json"), engineConfigBytes(options));
         JSONObject summary = new JSONObject();
         summary.put("game", game.getCanonicalPath());
         summary.put("title", GameLibrary.title(game));
@@ -68,6 +68,23 @@ final class LaunchSession {
         StartupConfig.write(new File(directory, "session.json"), summary.toString(2).getBytes(StandardCharsets.UTF_8));
         StartupConfig.write(new File(context.getFilesDir(), "latest-session.txt"), directory.getAbsolutePath().getBytes(StandardCharsets.UTF_8));
         prune(directory);
+    }
+
+    static byte[] engineConfigBytes(JSONObject options) throws Exception {
+        String json = options.toString(2);
+        StringBuilder ascii = new StringBuilder(json.length());
+        final String hex = "0123456789abcdef";
+        for (int i = 0; i < json.length(); i++) {
+            char character = json.charAt(i);
+            if (character <= 0x7f) {
+                ascii.append(character);
+            } else {
+                ascii.append('\\').append('u');
+                for (int shift = 12; shift >= 0; shift -= 4)
+                    ascii.append(hex.charAt((character >> shift) & 0xf));
+            }
+        }
+        return ascii.toString().getBytes(StandardCharsets.US_ASCII);
     }
 
     static JSONObject baseOptions(File game) throws Exception {

@@ -9,6 +9,7 @@ import argparse
 from pathlib import Path
 import subprocess
 import tempfile
+import shutil
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--json-jar', type=Path, required=True)
@@ -76,3 +77,31 @@ with tempfile.TemporaryDirectory(prefix='mkxp-library-tests-') as temp:
     for name in ('ConfigTextTest', 'LibrarySessionTest'):
         subprocess.run(['java', '-cp', classpath, 'com.hatkid.mkxpz.' + name,
                         str(work / 'fixture'), str(root / 'app/src/main/assets')], check=True)
+    if not shutil.which('c++'):
+        raise SystemExit('c++ is required to verify engine JSON compatibility')
+    native_test = work / 'engine-json-test.cpp'
+    native_test.write_text(r'''
+#include <cassert>
+#include <cstdint>
+#include <type_traits>
+#include <fstream>
+#include <iterator>
+#include "util/json5pp.hpp"
+int main(int argc, char** argv) {
+    assert(argc == 2);
+    std::ifstream file(argv[1]);
+    assert(file.good());
+    std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    for (unsigned char byte : text) assert(byte < 128);
+    auto config = json5pp::parse5(text);
+    assert(config["windowTitle"].as_string() == u8"Pokémon Essentials v21.1");
+    assert(config["bindingNames"]["c"].as_string() == u8"確認");
+    assert(config["gameFolder"].as_string().find(u8"Pokémon/日本語") != std::string::npos);
+    assert(config[u8"é"].as_string() == "Literal \\u00e9, quotes \" and newline\n");
+}
+''')
+    native_binary = work / 'engine-json-test'
+    subprocess.run(['c++', '-std=c++11', '-I', str(root / 'app/jni/mkxp-z/src'),
+                    str(native_test), '-o', str(native_binary)], check=True)
+    subprocess.run([str(native_binary), str(work / 'fixture/unicode-engine-config.json')], check=True)
+    print('Generated ASCII configuration passed the bundled engine JSON parser.')

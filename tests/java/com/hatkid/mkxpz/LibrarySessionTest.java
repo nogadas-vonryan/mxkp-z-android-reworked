@@ -111,6 +111,27 @@ public final class LibrarySessionTest {
         check(other.options.getJSONArray("preloadScript").length() == 2, "Script selection leaked to another game");
         check(rootBefore.equals(read(rootConfig)) && gameBefore.equals(read(gameConfig)), "Original configs were modified");
 
+        File unicodeGame = game(new File(work, "Pokémon/日本語"), "Pokémon", "Game.exe");
+        File unicodeConfig = new File(unicodeGame, "mkxp.json");
+        JSONObject unicodeOptions = new JSONObject()
+                .put("windowTitle", "Pokémon Essentials v21.1")
+                .put("bindingNames", new JSONObject().put("c", "確認"))
+                .put("é", "Literal \\u00e9, quotes \" and newline\n");
+        write(unicodeConfig, unicodeOptions.toString(2));
+        String unicodeBefore = read(unicodeConfig);
+        LaunchSession unicodeSession = new LaunchSession(context, unicodeGame, library);
+        byte[] engineBytes = Files.readAllBytes(new File(unicodeSession.directory, "mkxp.json").toPath());
+        for (byte value : engineBytes) check(value >= 0, "Engine config contains non-ASCII bytes");
+        String engineJson = new String(engineBytes, StandardCharsets.US_ASCII);
+        Files.write(new File(work, "unicode-engine-config.json").toPath(), engineBytes);
+        check(engineJson.contains("Pok\\u00e9mon"), "Accented title was not escaped");
+        JSONObject decoded = StartupConfig.parse(engineBytes);
+        check(decoded.getString("windowTitle").equals("Pokémon Essentials v21.1"), "Escaping changed the title");
+        check(decoded.getString("gameFolder").equals(unicodeGame.getCanonicalPath()), "Escaping changed the Unicode game path");
+        check(decoded.getJSONObject("bindingNames").getString("c").equals("確認"), "Escaping changed bindings");
+        check(decoded.getString("é").equals(unicodeOptions.getString("é")), "Escaping changed keys or existing JSON escapes");
+        check(unicodeBefore.equals(read(unicodeConfig)) && rootBefore.equals(read(rootConfig)), "Unicode launch modified source configs");
+
         profile.put("scripts", new JSONArray().put("scripts/missing.rb"));
         library.saveProfile(a, profile);
         String latestBefore = read(new File(context.getFilesDir(), "latest-session.txt"));
